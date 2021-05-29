@@ -1,31 +1,32 @@
-from auc_fifo_hinge import auc_fifo_hinge
-from auc_olp_hinge import auc_olp_hinge
-from auc_oam_gra_hinge import auc_oam_gra_hinge
-from auc_olp_1_hinge import auc_olp_1_hinge
-from auc_oam_gra_1_hinge import auc_oam_gra_1_hinge
-from auc_pair_hinge import auc_pair_hinge
-from auc_fifo_loglink import auc_fifo_loglink
-from auc_fifo_logistic import auc_fifo_logistic
-from auc_spauc_square import auc_spauc_square
+from alg import auc_fifo_hinge
+from alg import auc_fifo_square
+from alg import auc_fifo_loglink
+from alg import auc_spauc_square
+from alg import auc_fifo_logistic
+from alg import auc_olp_hinge
+from alg import auc_olp_square
+from alg import auc_oam_gra_hinge
+from alg import auc_olp_1_hinge
+from alg import auc_oam_gra_1_hinge
+from alg import auc_pair_hinge
+from alg import auc_pair_square
 import numpy as np
 from concurrent.futures import ProcessPoolExecutor
 from sklearn.model_selection import RepeatedKFold
 import itertools
-from utils import get_res_idx
+from utils import get_res_idx, get_etas
 
 def exp_test(x, y, loss, method, options):
-    num_split = 5
-    num_repeat = options['n_repeat']
+    options['res_idx'] = get_res_idx(options['n_pass'] * (options['n_tr'] - 1), options)
     # unify the record length
-    n_tr_ = 1. - 1. / num_split
-    n_tr = int(len(y) * n_tr_)
     # n_tr - 1 to avoid overflowing
-    options['res_idx'] = get_res_idx(options['n_pass'] * (n_tr - 1), options)
     n_idx = len(options['res_idx'])
-    time_rec = np.zeros([num_split * num_repeat, n_idx])
-    auc_rec = np.zeros([num_split * num_repeat, n_idx])
+    # define the etas to run all test since unified
+    options['etas'] = get_etas(options['n_pass'] * options['n_tr'], options['eta'], options)
+    time_rec = np.zeros([options['n_split'] * options['n_repeat'], n_idx])
+    auc_rec = np.zeros([options['n_split'] * options['n_repeat'], n_idx])
     k = 0
-    k_fold = RepeatedKFold(n_splits=num_split, n_repeats=num_repeat)
+    k_fold = RepeatedKFold(n_splits=options['n_split'], n_repeats=options['n_repeat'])
     with ProcessPoolExecutor(options['n_proc']) as executor:
         results = executor.map(help_para, itertools.repeat((x, y, loss, method, options)), k_fold.split(x))
     for auc_, time_ in results:
@@ -53,8 +54,8 @@ def help_para(arg1, arg2):
 def auc_fix_para(x, y, loss, method, options, idx):
     idx_tr = idx[0]
     idx_te = idx[1]
-    x_tr, x_te = x[idx_tr], x[idx_te]
-    y_tr, y_te = y[idx_tr], y[idx_te]
+    x_tr, x_te = x[idx_tr[:options['n_tr']]], x[idx_te]
+    y_tr, y_te = y[idx_tr[:options['n_tr']]], y[idx_te]
 
     if loss == 'hinge':
         if method == 'auc_fifo':
@@ -87,6 +88,12 @@ def auc_fix_para(x, y, loss, method, options, idx):
     elif loss == 'square':
         if method == 'auc_spauc':
             auc_t, time_t = auc_spauc_square(x_tr, y_tr, x_te, y_te, options)
+        elif method == 'auc_fifo':
+            auc_t, time_t = auc_fifo_square(x_tr, y_tr, x_te, y_te, options)
+        elif method == 'auc_pair':
+            auc_t, time_t = auc_pair_square(x_tr, y_tr, x_te, y_te, options)
+        elif method == 'auc_olp':
+            auc_t, time_t = auc_olp_square(x_tr, y_tr, x_te, y_te, options)
         else:
             print('Wrong method name!')
             return
@@ -96,10 +103,11 @@ def auc_fix_para(x, y, loss, method, options, idx):
     return auc_t, time_t
 
 if __name__ == '__main__':
-    from utils import data_processing
+    from utils import data_processing, get_idx
     import json
     import pickle as pkl
     import os
+    import timeit
 
     options = dict()
     options['n_proc'] = 4
@@ -109,17 +117,26 @@ if __name__ == '__main__':
     options['log_res'] = True
     options['buffer'] = 200
     options['n_repeat'] = 5
+    # options['n_split'] = 5
+    options['proj_flag'] = True
+    options['eta_geo'] = 'const'
 
     data = 'diabetes'
     loss = 'hinge'
-    method = 'auc_olp'
+    method = 'auc_fifo'
     x, y = data_processing(data)
+    n, options['dim'] = x.shape
+    # unify number of training
+    options['n_split'] = 5
+    options['n_tr'] = int((options['n_split'] - 1) / options['n_split'] * n)
+    # options['n_tr'] = 256
+    # options['n_split'] = int(n / options['n_tr'])
 
     cur_path = os.getcwd()
     config_path = os.path.join(cur_path, 'config')
 
     res_path = os.path.join(cur_path, 'res')
-    filename = data + '_' + method + '_' + loss
+    filename = data + '_' + method + '_' + loss # + '_4dp'
 
     if os.path.exists(os.path.join(config_path, filename + '.json')):
         with open(os.path.join(config_path, filename + '.json'), 'r') as file:

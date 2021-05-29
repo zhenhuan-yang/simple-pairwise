@@ -12,7 +12,10 @@ def data_processing(data):
     # SGD for AUC optimization without regularization
 
     cur_path = os.getcwd()
-    data_path = os.path.join(cur_path, 'data')
+    if os.path.exists(os.path.join(cur_path, 'data')):
+        data_path = os.path.join(cur_path, 'data')
+    else:
+        data_path = os.path.join(os.path.dirname(cur_path), 'data')
     # -----------------------------------------
     # processing the data
     print(data)
@@ -76,13 +79,14 @@ def data_processing(data):
     return x, y
 
 def get_idx(n_data, n_pass):
-    idx = np.zeros(n_data * n_pass, dtype=int)
+    # idx = np.zeros(n_data * n_pass, dtype=int)
     # random permutation
     # for i_pass in np.arange(n_pass):
         # idx[i_pass * n_data : (i_pass + 1) * n_data] = np.random.permutation(n_data)
     # random selection
-    for i in range(n_data * n_pass):
-        idx[i] = np.random.randint(n_data)
+    # for i in range(n_data * n_pass):
+    #     idx[i] = np.random.randint(n_data)
+    idx = np.random.randint(n_data, size=n_data * n_pass)
     return idx
 
 # def get_batch_idx(n_data, n_pass, options):
@@ -107,30 +111,37 @@ def get_past_idx(n_data, n_pass):
     return idx
 
 def get_pair_idx(n_data, n_pass):
-    # idx = np.zeros((n_data * n_pass, 2), dtype=int)
+    idx = np.zeros((n_data * n_pass, 2), dtype=int)
     # # random permutation
     # # for i_pass in np.arange(n_pass):
     #     # idx[i_pass * n_data : (i_pass + 1) * n_data] = np.random.permutation(n_data)
     # # random selection
     # for i in range(n_data * n_pass):
     #     idx[i] = np.random.choice(n_data, size=2, replace=False)
-    idx = np.zeros((n_data * n_pass, 2), dtype=int)
-    for i in range(n_data * n_pass):
-        idx[i][0] = np.random.randint(n_data)
-        arr = np.arange(n_data)
-        mask = np.ones(len(arr), dtype=bool)
-        mask[idx[i][0]] = False
-        after_arr = arr[mask]
-        idx[i][1] = np.random.choice(after_arr)
+    # idx = np.zeros((n_data * n_pass, 2), dtype=int)
+    # for i in range(n_data * n_pass):
+    #     idx[i][0] = np.random.randint(n_data)
+    #     # arr = np.arange(n_data)
+    #     # mask = np.ones(len(arr), dtype=bool)
+    #     # mask[idx[i][0]] = False
+    #     # after_arr = arr[mask]
+    #     # idx[i][1] = np.random.choice(after_arr)
+    #     idx[i][1] = np.random.randint(n_data)
+    idx1= np.random.randint(n_data, size=n_data * n_pass)
+    idx2 = np.random.randint(n_data - 1, size=n_data * n_pass)
+    I = np.where(idx1 == idx2)
+    idx2[I[0]] = n_data - 1
+    idx[:, 0] = idx1
+    idx[:, 1] = idx2
     return idx
 
 def get_res_idx(n_iter, options):
     if options['log_res']:
-        res_idx = 2 ** (np.arange(4, np.log2(n_iter), options['rec_log']))
+        res_idx = (2 ** (np.arange(4, np.log2(n_iter), options['rec_log']))).astype(int)
     else:
         res_idx = np.arange(1, n_iter, options['rec'])
     res_idx[-1] = n_iter
-    res_idx = [int(i) for i in res_idx] # map(int, res_idx)
+    # res_idx = [int(i) for i in res_idx] # map(int, res_idx)
     return res_idx
 
 def get_stage_idx(n_tr):
@@ -147,3 +158,15 @@ def get_stage_res_idx(stages, n_pass):
     for stage in stages:
         res_idx.append(stage[-1] * n_pass)
     return res_idx
+
+def get_etas(n_iter, eta, options):
+    if options['eta_geo'] == 'const':
+        etas = eta * np.ones(n_iter) / np.sqrt(n_iter)
+    elif options['eta_geo'] == 'sqrt':
+        etas = eta / np.sqrt(np.arange(1, n_iter + 1))
+    elif options['eta_geo'] == 'fast':
+        etas = eta / np.arange(1, n_iter + 1)
+    else:
+        print('Wrong step size geometry!')
+        etas = eta * np.ones(n_iter) / np.sqrt(n_iter)
+    return etas

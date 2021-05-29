@@ -19,7 +19,7 @@ ijcnn1 49990, 22
 ionosphere 351, 34
 iris 150, 4
 letter 15000, 161
-leukemia* 38, 7129
+leukemia* 38, 7129li
 liver-disorders 145, 5
 madelon* 2000, 500
 mnist 60000, 780
@@ -44,21 +44,23 @@ w8a 49749, 300
 wine 178, 13
 '''
 
-from exp_command import exp_command
+from plot_exp_command import plot_exp_command
 from itertools import product
+
+# data_list = ['a9a', 'ijcnn1', 'mnist', 'w8a']
 
 
 # data_list = ['australian', 'diabetes', 'dna', 'fourclass', 'german', 'heart', 'ionosphere', 'iris',
 #              'letter', 'liver-disorders', 'pendigits', 'satimage', 'sonar', 'splice',
 #              'svmguide1', 'usps', 'vehicle', 'vowel', 'wine']
 
-# data_list = ['diabetes', 'german', 'ijcnn1', 'letter', 'mnist', 'usps']
-data_list = ['german']
-
-method_list = ['olp_1']
+data_list = ['diabetes', 'german', 'ijcnn1', 'letter', 'mnist', 'usps']
+method_list = ['fifo']
 
 for data, method in product(data_list, method_list):
-    exp_command(data, 'hinge', method)
+    plot_exp_command(data, 'loglink', method)
 
-# for data in data_list:
-#     exp_command(data, 'square', 'spauc')
+# method_list = ['fifo', 'pair']
+#
+# for data, method in product(data_list, method_list):
+#     plot_exp_command(data, 'square', method)
